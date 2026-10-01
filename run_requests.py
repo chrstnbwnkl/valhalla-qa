@@ -5,7 +5,7 @@ Requests live in ``requests/<action>/<costing>/<name>.json`` and look like
 ``{"request": {...}}``. Each one is POSTed to ``<valhalla-url>/<action>``.
 
 The output zip contains ``responses/<action>_<costing>_<name>.json`` per request,
-each holding ``{"status_code": <int|null>, "response": <body>}``. Non-JSON bodies
+each holding ``{"action": ..., "costing": ..., "status_code": <int|null>, "response": <body>}``. Non-JSON bodies
 (e.g. GPX) are stored as a string. Transport failures (timeouts, connection errors)
 are recorded under ``"error"`` and make the script exit non-zero.
 
@@ -41,7 +41,8 @@ def collect_requests(requests_dir: Path) -> list[tuple[str, Path]]:
 
 
 def fire(base_url: str, path: Path, timeout: float) -> dict:
-    action = path.parent.parent.name
+    action, costing = path.parent.parent.name, path.parent.name
+    meta = {"action": action, "costing": costing}
     with path.open() as f:
         body = json.load(f)["request"]
 
@@ -58,13 +59,13 @@ def fire(base_url: str, path: Path, timeout: float) -> dict:
         # valhalla answers bad requests with a JSON error body, which is a valid QA result
         status, raw = e.code, e.read()
     except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-        return {"status_code": None, "response": None, "error": str(getattr(e, "reason", e))}
+        return {**meta, "status_code": None, "response": None, "error": str(getattr(e, "reason", e))}
 
     try:
         payload = json.loads(raw)
     except ValueError:
         payload = raw.decode("utf-8", errors="replace")
-    return {"status_code": status, "response": payload}
+    return {**meta, "status_code": status, "response": payload}
 
 
 def main() -> int:
