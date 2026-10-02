@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Valhalla QA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/fflate@0.8.2/umd/index.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header id="topbar">
+    <a href="#/" class="brand">Valhalla QA</a>
+    <nav id="crumbs"></nav>
+    <span id="status"></span>
+    <span id="runs"></span>
+  </header>
+
+  <main>
+    <section id="landing" hidden>
+      <div class="landing">
+        <h1>Load a QA artifact</h1>
+        <p>The zip written by <code>summary.py</code>: <code>summary.json</code> plus the two run zips.</p>
+        <form id="url-form">
+          <input id="url-input" type="url" placeholder="https://…/artifact.zip" required>
+          <button class="btn primary" type="submit">Load</button>
+        </form>
+        <p class="dim">The URL ends up in <code>?url=</code>, so the page can be linked to directly.</p>
+        <label class="drop">
+          <input id="file-input" type="file" accept=".zip,application/zip">
+          <span>Choose or drop a downloaded artifact zip</span>
+        </label>
+        <details>
+          <summary>GitHub token for GitHub Actions artifact URLs</summary>
+          <p class="dim">The GitHub API needs a token with <code>actions:read</code> to download artifacts.
+            It is kept in this browser's local storage only.</p>
+          <input id="token-input" type="password" placeholder="github_pat_…" autocomplete="off">
+        </details>
+        <p id="landing-error" class="callout" hidden></p>
+      </div>
+    </section>
+
+    <section id="front" hidden></section>
+
+    <section id="table" hidden>
+      <div id="table-head"></div>
+      <div id="filters">
+        <input id="f-search" type="search" placeholder="Filter by name">
+        <select id="f-costing"></select>
+        <select id="f-sort"></select>
+        <span id="f-count"></span>
+      </div>
+      <div id="list-head" class="row head"></div>
+      <div id="list"><div id="list-spacer"></div></div>
+    </section>
+
+    <section id="detail" hidden>
+      <aside id="side">
+        <div id="side-head"></div>
+        <div id="side-module"></div>
+        <div id="side-tail"></div>
+      </aside>
+      <div id="main"></div>
+    </section>
+  </main>
+
+  <div id="drop-hint" hidden>Drop the artifact zip</div>
+</body>
+</html>

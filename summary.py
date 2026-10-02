@@ -9,6 +9,9 @@ Every response pair is classified as identical, different, or present in only on
 run. Different responses get a list of differing JSON paths and, for actions with
 a dedicated parser (currently only ``route`` in valhalla and osrm format), a
 semantic comparison of distance, duration, cost, geometry and maneuvers.
+
+summary.json also holds per-action totals under ``actions`` and an index of every
+response (action, costing, status) under ``responses``.
 """
 
 import argparse
@@ -227,6 +230,23 @@ def summarize(name_a: str, run_a: dict, name_b: str, run_b: dict) -> dict:
         else:
             different[name] = compare_pair(run_a[name], run_b[name])
 
+    # per response index and per action totals, so consumers don't have to parse file names
+    responses, actions = {}, {}
+    for name in sorted(run_a.keys() | run_b.keys()):
+        f = run_a.get(name) or run_b[name]
+        status = (
+            "only_in_a" if name in only_a
+            else "only_in_b" if name in only_b
+            else "different" if name in different
+            else "identical"
+        )
+        responses[name] = {"action": f.get("action"), "costing": f.get("costing"), "status": status}
+        counts = actions.setdefault(
+            f.get("action"), {"total": 0, "identical": 0, "different": 0, "only_in_a": 0, "only_in_b": 0}
+        )
+        counts["total"] += 1
+        counts[status] += 1
+
     route_total = sum(1 for n in common if run_a[n].get("action") == "route")
     return {
         "a": name_a,
@@ -239,10 +259,12 @@ def summarize(name_a: str, run_a: dict, name_b: str, run_b: dict) -> dict:
             "only_in_a": len(only_a),
             "only_in_b": len(only_b),
         },
+        "actions": actions,
         "route": route_stats(different, route_total),
         "only_in_a": only_a,
         "only_in_b": only_b,
         "different": different,
+        "responses": responses,
     }
 
 

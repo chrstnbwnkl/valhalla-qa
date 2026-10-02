@@ -1,0 +1,20 @@
+{
+  "request": {
+    "locations": [
+      {
+        "lat": 47.250321,
+        "lon": 8.841716
+      },
+      {
+        "lat": 47.225769,
+        "lon": 8.943212
+      }
+    ],
+    "costing": "truck",
+    "costing_options": {
+      "truck": {
+        "height": 2.107
+      }
+    }
+  }
+}
