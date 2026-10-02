@@ -44,6 +44,11 @@ export function fmtDur(s) {
   return `${sign}${Math.floor(s / 3600)} h ${trim((s % 3600) / 60, 1)} min`;
 }
 
+export function fmtMs(ms) {
+  if (ms == null || Number.isNaN(ms)) return '–';
+  return ms < 1000 ? `${trim(ms, ms < 10 ? 2 : 0)} ms` : fmtDur(ms / 1000);
+}
+
 export function fmtNum(v) {
   if (v == null || Number.isNaN(v)) return '–';
   return typeof v === 'number' ? trim(v, 3) : String(v);

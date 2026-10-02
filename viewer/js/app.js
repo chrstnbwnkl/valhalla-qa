@@ -4,7 +4,7 @@
 // so artifacts with thousands of requests stay cheap. How differences are evaluated and shown is up
 // to the action modules in ./actions.
 import {
-  $, h, fmtBytes, nextFrame, jsonView, copyButton,
+  $, h, fmtBytes, fmtDur, fmtMs, nextFrame, jsonView, copyButton, pctSpan, relDiff,
 } from './util.js';
 import {
   fetchBytes, openArtifact, getToken, setToken,
@@ -227,7 +227,74 @@ function renderFront() {
     h('div', { class: 'arow head' },
       h('span', null, 'Action'), h('span', { class: 'num' }, 'Requests'), h('span', { class: 'num' }, 'Changed'),
       h('span', { class: 'num' }, 'Share'), h('span'), h('span', null, 'Breakdown')),
-    rows));
+    rows,
+    requestTimings(),
+    buildTimings()));
+}
+
+/** "a → b" over "±x%", or just the value that exists */
+function timeCell(a, b, fmt) {
+  return h('span', { class: 'num tcell' },
+    h('span', null, fmt(a), h('span', { class: 'dim' }, ' → '), fmt(b)),
+    pctSpan(relDiff(a, b)));
+}
+
+function requestTimings() {
+  const t = state.summary.timings;
+  if (!t) return null;
+  const actions = [...new Set([...Object.keys(t.a || {}), ...Object.keys(t.b || {})])].sort();
+  if (!actions.length) return null;
+  const metrics = [['mean_ms', 'Mean'], ['median_ms', 'Median'], ['p95_ms', 'p95'], ['max_ms', 'Max']];
+  return h('div', { class: 'timings' },
+    h('h2', null, 'Request timings'),
+    h('div', { class: 'trow req head' },
+      h('span', null, 'Action'), h('span', { class: 'num' }, 'Timed'),
+      metrics.map(([, label]) => h('span', { class: 'num' }, label))),
+    actions.map((action) => {
+      const a = t.a?.[action] || {};
+      const b = t.b?.[action] || {};
+      return h('div', { class: 'trow req' },
+        h('span', { class: 'mono strong' }, action),
+        h('span', { class: 'num' }, a.count === b.count ? a.count : `${a.count ?? 0} / ${b.count ?? 0}`),
+        metrics.map(([key]) => timeCell(a[key], b[key], fmtMs)));
+    }));
+}
+
+function buildTimings() {
+  const build = state.summary.build;
+  if (!build) return null;
+  const { a, b } = state.summary;
+  // stages can repeat, pair them up by name and occurrence
+  const key = (stages) => {
+    const seen = new Map();
+    return (stages || []).map((st) => {
+      const n = (seen.get(st.name) || 0) + 1;
+      seen.set(st.name, n);
+      return [`${st.name}#${n}`, st];
+    });
+  };
+  const rows = new Map();
+  for (const run of ['a', 'b']) {
+    for (const [k, st] of key(build[run]?.stages)) {
+      if (!rows.has(k)) rows.set(k, { name: st.name });
+      rows.get(k)[run] = st.seconds;
+    }
+  }
+  const row = (label, sa, sb, cls) => h('div', { class: `trow build ${cls || ''}` },
+    h('span', { class: 'mono', title: label }, label),
+    h('span', { class: 'num' }, fmtDur(sa)),
+    h('span', { class: 'num' }, fmtDur(sb)),
+    h('span', { class: 'num' }, sa != null && sb != null ? `${sb - sa > 0 ? '+' : sb - sa < 0 ? '−' : '±'}${fmtDur(Math.abs(sb - sa))}` : ''),
+    h('span', { class: 'num' }, pctSpan(relDiff(sa, sb))));
+  return h('div', { class: 'timings' },
+    h('h2', null, 'Tile build timings'),
+    h('div', { class: 'trow build head' },
+      h('span', null, 'Stage'),
+      h('span', { class: 'num' }, h('span', { class: 'tag a' }, 'A'), a),
+      h('span', { class: 'num' }, h('span', { class: 'tag b' }, 'B'), b),
+      h('span', { class: 'num' }, 'Δ'), h('span', { class: 'num' }, 'Δ %')),
+    row('total', build.a?.total_seconds, build.b?.total_seconds, 'total'),
+    [...rows.values()].map((r) => row(r.name.split('::').pop(), r.a, r.b)));
 }
 
 // ---------------------------------------------------------------------------

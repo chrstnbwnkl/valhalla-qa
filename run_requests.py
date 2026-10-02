@@ -5,7 +5,8 @@ Requests live in ``requests/<action>/<costing>/<name>.json`` and look like
 ``{"request": {...}}``. Each one is POSTed to ``<valhalla-url>/<action>``.
 
 The output zip contains ``responses/<action>_<costing>_<name>.json`` per request,
-each holding ``{"action": ..., "costing": ..., "status_code": <int|null>, "response": <body>}``. Non-JSON bodies
+each holding ``{"action": ..., "costing": ..., "status_code": <int|null>, "time_ms": <float>, "response": <body>}``,
+where ``time_ms`` is the wall time from sending the request until the body was read. Non-JSON bodies
 (e.g. GPX) are stored as a string. Transport failures (timeouts, connection errors)
 are recorded under ``"error"`` and make the script exit non-zero.
 """
@@ -54,6 +55,8 @@ def fire(base_url: str, path: Path, timeout: float) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+    start = time.perf_counter()
+    elapsed_ms = lambda: round((time.perf_counter() - start) * 1000, 3)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             status, raw = resp.status, resp.read()
@@ -64,9 +67,12 @@ def fire(base_url: str, path: Path, timeout: float) -> dict:
         return {
             **meta,
             "status_code": None,
+            "time_ms": elapsed_ms(),
             "response": None,
             "error": str(getattr(e, "reason", e)),
         }
+
+    meta["time_ms"] = elapsed_ms()
 
     try:
         payload = json.loads(raw)
@@ -143,7 +149,7 @@ def main() -> int:
                 )
             else:
                 print(
-                    f"[{i}/{len(requests)}] {name}: {result['status_code']}",
+                    f"[{i}/{len(requests)}] {name}: {result['status_code']} in {result['time_ms']:.0f}ms",
                     file=sys.stderr,
                 )
             zf.writestr(

@@ -12,17 +12,28 @@ semantic comparison of distance, duration, cost, geometry and maneuvers.
 
 summary.json also holds per-action totals under ``actions`` and an index of every
 response (action, costing, status) under ``responses``.
+
+Timings are kept apart from the comparison: ``timings`` holds per-action request
+time statistics for both runs (from the ``time_ms`` of each response, transport
+failures left out). With ``--build-log-a``/``--build-log-b``, the ``[TIMING]``
+lines of the valhalla_build_tiles logs end up under ``build``, per stage and in
+total.
 """
 
 import argparse
 import json
+import re
 import shutil
+import statistics
 import sys
 import zipfile
 from pathlib import Path
 
 MAX_DIFF_PATHS = 20
 MAX_TOP_CHANGES = 10
+
+# response file keys that describe the run rather than the result, ignored when comparing
+VOLATILE_KEYS = ("time_ms",)
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +63,65 @@ def bundle_run(src: Path, dest: Path) -> None:
                 zf.write(p, f"responses/{p.name}")
     else:
         shutil.copyfile(src, dest)
+
+
+def comparable(f: dict) -> dict:
+    return {k: v for k, v in f.items() if k not in VOLATILE_KEYS}
+
+
+# ---------------------------------------------------------------------------
+# timings
+
+
+# e.g. "2026-06-23 10:09:26.503975933 [TIMING] src/mjolnir/util.cc::build_tile_set took 96s"
+TIMING_RE = re.compile(r"\[TIMING\]\s+(\S+)\s+took\s+([\d.]+)\s*(ms|s|min|h)\b")
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+TIME_UNITS = {"ms": 0.001, "s": 1, "min": 60, "h": 3600}
+# the stage that wraps the whole build
+BUILD_TOTAL_STAGE = "build_tile_set"
+
+
+def parse_build_log(path: Path) -> dict:
+    """Return {stages: [{name, seconds}], total_seconds} from the [TIMING] lines of a build log."""
+    stages = []
+    with path.open(errors="replace") as f:
+        for line in f:
+            m = TIMING_RE.search(ANSI_RE.sub("", line))
+            if m:
+                stages.append({"name": m[1], "seconds": float(m[2]) * TIME_UNITS[m[3]]})
+    total = next((s for s in reversed(stages) if s["name"].endswith(f"::{BUILD_TOTAL_STAGE}")), None)
+    if total is None and stages:
+        # no wrapping stage logged, fall back to the sum
+        return {"stages": stages, "total_seconds": sum(s["seconds"] for s in stages)}
+    return {
+        "stages": [s for s in stages if s is not total],
+        "total_seconds": total["seconds"] if total else None,
+    }
+
+
+def time_stats(times: list[float]) -> dict:
+    if not times:
+        return {"count": 0}
+    times = sorted(times)
+    return {
+        "count": len(times),
+        "total_ms": round(sum(times), 3),
+        "mean_ms": round(statistics.fmean(times), 3),
+        "median_ms": round(statistics.median(times), 3),
+        "p95_ms": round(times[min(len(times) - 1, int(0.95 * len(times)))], 3),
+        "min_ms": times[0],
+        "max_ms": times[-1],
+    }
+
+
+def request_timings(run: dict[str, dict]) -> dict:
+    """Per action request time statistics, responses without a time or with a transport error are skipped."""
+    per_action: dict[str, list[float]] = {}
+    for f in run.values():
+        if "error" in f or not isinstance(f.get("time_ms"), (int, float)):
+            continue
+        per_action.setdefault(f.get("action"), []).append(f["time_ms"])
+    return {action: time_stats(times) for action, times in sorted(per_action.items())}
 
 
 # ---------------------------------------------------------------------------
@@ -218,14 +288,14 @@ def route_stats(different: dict[str, dict], route_total: int) -> dict:
     return stats
 
 
-def summarize(name_a: str, run_a: dict, name_b: str, run_b: dict) -> dict:
+def summarize(name_a: str, run_a: dict, name_b: str, run_b: dict, build: dict | None = None) -> dict:
     only_a = sorted(run_a.keys() - run_b.keys())
     only_b = sorted(run_b.keys() - run_a.keys())
     common = sorted(run_a.keys() & run_b.keys())
 
     identical, different = [], {}
     for name in common:
-        if run_a[name] == run_b[name]:
+        if comparable(run_a[name]) == comparable(run_b[name]):
             identical.append(name)
         else:
             different[name] = compare_pair(run_a[name], run_b[name])
@@ -248,7 +318,7 @@ def summarize(name_a: str, run_a: dict, name_b: str, run_b: dict) -> dict:
         counts[status] += 1
 
     route_total = sum(1 for n in common if run_a[n].get("action") == "route")
-    return {
+    summary = {
         "a": name_a,
         "b": name_b,
         "totals": {
@@ -260,12 +330,16 @@ def summarize(name_a: str, run_a: dict, name_b: str, run_b: dict) -> dict:
             "only_in_b": len(only_b),
         },
         "actions": actions,
+        "timings": {"a": request_timings(run_a), "b": request_timings(run_b)},
         "route": route_stats(different, route_total),
         "only_in_a": only_a,
         "only_in_b": only_b,
         "different": different,
         "responses": responses,
     }
+    if build:
+        summary["build"] = build
+    return summary
 
 
 def main() -> int:
@@ -275,18 +349,21 @@ def main() -> int:
     parser.add_argument("-o", "--output", required=True, type=Path, help="output directory")
     parser.add_argument("--name-a", help="name of the first run (default: its file name without extension)")
     parser.add_argument("--name-b", help="name of the second run (default: its file name without extension)")
+    parser.add_argument("--build-log-a", type=Path, help="valhalla_build_tiles log of the first run, for build timings")
+    parser.add_argument("--build-log-b", type=Path, help="valhalla_build_tiles log of the second run, for build timings")
     args = parser.parse_args()
 
     name_a = args.name_a or args.run_a.stem
     name_b = args.name_b or args.run_b.stem
     if name_a == name_b:
         parser.error(f"both runs are named {name_a!r}, use --name-a/--name-b to tell them apart")
-    for run in (args.run_a, args.run_b):
-        if not run.exists():
-            parser.error(f"{run} does not exist")
+    for path in (args.run_a, args.run_b, args.build_log_a, args.build_log_b):
+        if path and not path.exists():
+            parser.error(f"{path} does not exist")
 
+    build = {run: parse_build_log(log) for run, log in (("a", args.build_log_a), ("b", args.build_log_b)) if log}
     run_a, run_b = load_run(args.run_a), load_run(args.run_b)
-    summary = summarize(name_a, run_a, name_b, run_b)
+    summary = summarize(name_a, run_a, name_b, run_b, build)
 
     args.output.mkdir(parents=True, exist_ok=True)
     bundle_run(args.run_a, args.output / f"{name_a}.zip")
