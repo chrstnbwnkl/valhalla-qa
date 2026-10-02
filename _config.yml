@@ -1,6 +1,5 @@
-# GitHub Pages: only publish the viewer, served at /<repo>/viewer/
+# GitHub Pages: only publish the viewer (/<repo>/viewer/) and the requests it links to (/<repo>/requests/)
 exclude:
   - geojson/
   - qa-results/
-  - requests/
   - "*.py"

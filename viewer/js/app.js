@@ -12,6 +12,8 @@ import {
 import { moduleFor } from './actions/index.js';
 
 const ROW_HEIGHT = 36;
+// request files as served next to the viewer (github pages, or a server started in the repo root)
+const REQUESTS_BASE = '../requests/';
 
 // file name fallback for summaries without a "responses" index
 const ACTIONS = ['route', 'optimized_route', 'sources_to_targets', 'trace_route', 'trace_attributes', 'isochrone',
@@ -421,8 +423,34 @@ function renderDetail(action, name) {
       tail.push(det);
     }
   }
+  tail.push(requestButton(item));
   $('#side-tail').replaceChildren(...tail.filter(Boolean));
   $('#side').scrollTop = 0;
+}
+
+function requestButton(item) {
+  const stem = item.name.slice(`${item.action}_${item.costing}_`.length).replace(/\.json$/, '');
+  const url = `${REQUESTS_BASE}${item.action}/${item.costing}/${stem}.json`;
+  let text = '';
+  const btn = copyButton(() => text, 'Copy request');
+  btn.classList.remove('small');
+  btn.title = 'copy request json to clipboard';
+  btn.disabled = true;
+  const note = h('span', { class: 'dim' });
+  // fetched up front: a clipboard write after an await can lose the click's user activation
+  fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then((json) => {
+      text = JSON.stringify(json.request, null, 2);
+      btn.disabled = false;
+    })
+    .catch(() => {
+      if (state.detail?.item === item) note.textContent = `not found: requests/${item.action}/${item.costing}/${stem}.json`;
+    });
+  return h('div', { class: 'request-copy' }, btn, note);
 }
 
 // ---------------------------------------------------------------------------
