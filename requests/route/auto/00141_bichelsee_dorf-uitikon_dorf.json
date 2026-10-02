@@ -1,0 +1,20 @@
+{
+  "request": {
+    "locations": [
+      {
+        "lat": 47.448032,
+        "lon": 8.922258
+      },
+      {
+        "lat": 47.370638,
+        "lon": 8.453791
+      }
+    ],
+    "costing": "auto",
+    "costing_options": {
+      "auto": {
+        "height": 3.377
+      }
+    }
+  }
+}
