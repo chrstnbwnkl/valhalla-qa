@@ -215,21 +215,21 @@ function ensureMap(main, summary) {
 }
 
 function addLayers(map) {
-  const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#0047ff';
+  const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2f55d4';
   for (const id of ['routes-a', 'routes-b', 'points-a', 'points-b', 'locations', 'hl-line', 'hl-point']) {
     map.addSource(id, { type: 'geojson', data: EMPTY });
   }
   const line = { 'line-cap': 'round', 'line-join': 'round' };
   const sel = ['==', ['get', 'selected'], true];
   const unsel = ['!=', ['get', 'selected'], true];
-  map.addLayer({ id: 'hl-line', type: 'line', source: 'hl-line', layout: line, paint: { 'line-color': '#000', 'line-width': 20, 'line-opacity': 0.22 } });
-  map.addLayer({ id: 'routes-a-other', type: 'line', source: 'routes-a', filter: unsel, layout: line, paint: { 'line-color': '#000', 'line-width': 5, 'line-opacity': 0.5, 'line-dasharray': [1, 1.5] } });
+  map.addLayer({ id: 'hl-line', type: 'line', source: 'hl-line', layout: line, paint: { 'line-color': '#1a1a1a', 'line-width': 20, 'line-opacity': 0.22 } });
+  map.addLayer({ id: 'routes-a-other', type: 'line', source: 'routes-a', filter: unsel, layout: line, paint: { 'line-color': '#1a1a1a', 'line-width': 5, 'line-opacity': 0.5, 'line-dasharray': [1, 1.5] } });
   map.addLayer({ id: 'routes-b-other', type: 'line', source: 'routes-b', filter: unsel, layout: line, paint: { 'line-color': primary, 'line-width': 3, 'line-opacity': 0.6, 'line-dasharray': [1, 1.5] } });
-  map.addLayer({ id: 'routes-a', type: 'line', source: 'routes-a', filter: sel, layout: line, paint: { 'line-color': '#000', 'line-width': 8 } });
+  map.addLayer({ id: 'routes-a', type: 'line', source: 'routes-a', filter: sel, layout: line, paint: { 'line-color': '#1a1a1a', 'line-width': 8 } });
   map.addLayer({ id: 'routes-b', type: 'line', source: 'routes-b', filter: sel, layout: line, paint: { 'line-color': primary, 'line-width': 3.5 } });
-  map.addLayer({ id: 'points-a', type: 'circle', source: 'points-a', paint: { 'circle-radius': 5, 'circle-color': '#fff', 'circle-stroke-color': '#000', 'circle-stroke-width': 2.5 } });
+  map.addLayer({ id: 'points-a', type: 'circle', source: 'points-a', paint: { 'circle-radius': 5, 'circle-color': '#fff', 'circle-stroke-color': '#1a1a1a', 'circle-stroke-width': 2.5 } });
   map.addLayer({ id: 'points-b', type: 'circle', source: 'points-b', paint: { 'circle-radius': 2.5, 'circle-color': primary } });
-  map.addLayer({ id: 'locations', type: 'circle', source: 'locations', paint: { 'circle-radius': 8, 'circle-color': '#000', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'locations', type: 'circle', source: 'locations', paint: { 'circle-radius': 8, 'circle-color': '#1a1a1a', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
   map.addLayer({ id: 'hl-point', type: 'circle', source: 'hl-point', paint: { 'circle-radius': 11, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': primary, 'circle-stroke-width': 3 } });
 
   for (const run of ['a', 'b']) {

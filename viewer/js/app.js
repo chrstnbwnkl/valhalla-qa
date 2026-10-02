@@ -61,6 +61,7 @@ const itemHref = (item) => `${actionHref(item.action)}/${encodeURIComponent(item
 
 function setStatus(text) {
   $('#status').textContent = text || '';
+  $('#loading-text').textContent = text || '';
 }
 
 function flagDef(item, flag) {
@@ -139,7 +140,7 @@ function buildItems() {
 // loading
 
 async function load(getBytes, label) {
-  showSection('front');
+  showSection('loading');
   setStatus(`Loading ${label}`);
   try {
     const bytes = await getBytes();
@@ -162,7 +163,7 @@ const loadFile = (file) => load(async () => new Uint8Array(await file.arrayBuffe
 // chrome
 
 function showSection(id) {
-  for (const s of ['landing', 'front', 'table', 'detail']) $(`#${s}`).hidden = s !== id;
+  for (const s of ['loading', 'landing', 'front', 'table', 'detail']) $(`#${s}`).hidden = s !== id;
 }
 
 function showLanding(error) {
